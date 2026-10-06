@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -54,7 +55,6 @@
             letter-spacing: 0.5px;
         }
 
-        /* Fixed Standard Input Area */
         textarea {
             width: 100%;
             height: 350px;
@@ -136,6 +136,13 @@
             background: #cc0000;
             color: #ffffff;
         }
+
+        .status-tag {
+            font-size: 11px;
+            color: #008800;
+            font-weight: normal;
+            margin-left: 5px;
+        }
     </style>
 </head>
 <body>
@@ -149,12 +156,14 @@
         <!-- Editor Section -->
         <div class="editor-section">
             <div class="section-title">DOCUMENT EDITOR</div>
-            <textarea id="editor" placeholder="Type here... (Try typing misspelled words like rehtaf, moter, appl)"></textarea>
+            <textarea id="editor" placeholder="Type here... (Try typing Fother, moter, appl, etc.)"></textarea>
         </div>
 
         <!-- Suggestions Side Panel -->
         <div class="suggestions-section">
-            <div class="section-title">MISSPELLED WORDS (CLICK TO FIX)</div>
+            <div class="section-title">
+                MISSPELLED WORDS <span id="dictStatus" class="status-tag">(Loading full dictionary...)</span>
+            </div>
             <div class="bad-words-box" id="badWordsBox">
                 <div class="empty-state">No spelling errors detected</div>
             </div>
@@ -167,7 +176,7 @@
     </div>
 
     <script>
-        // 1. Trie Data Structure
+        // 1. Trie Data Structure Node
         class TrieNode {
             constructor() {
                 this.children = {};
@@ -175,6 +184,7 @@
             }
         }
 
+        // 2. Trie Dictionary Implementation
         class TrieDictionary {
             constructor() {
                 this.root = new TrieNode();
@@ -182,7 +192,10 @@
 
             insert(word) {
                 let current = this.root;
-                for (let ch of word.toLowerCase()) {
+                const clean = word.trim().toLowerCase();
+                if (!clean) return;
+
+                for (let ch of clean) {
                     if (!current.children[ch]) {
                         current.children[ch] = new TrieNode();
                     }
@@ -193,7 +206,10 @@
 
             search(word) {
                 let current = this.root;
-                for (let ch of word.toLowerCase()) {
+                const clean = word.trim().toLowerCase();
+                if (!clean) return false;
+
+                for (let ch of clean) {
                     if (!current.children[ch]) return false;
                     current = current.children[ch];
                 }
@@ -203,17 +219,23 @@
             getSuggestions(misspelledWord, maxDistance) {
                 const suggestions = [];
                 const allWords = [];
+                // Collect search candidates
                 this.collectAllWords(this.root, "", allWords);
 
                 for (let word of allWords) {
-                    if (this.computeLevenshteinDistance(misspelledWord.toLowerCase(), word) <= maxDistance) {
-                        suggestions.push(word);
+                    // Filter suggestions close in length for performance
+                    if (Math.abs(word.length - misspelledWord.length) <= 2) {
+                        if (this.computeLevenshteinDistance(misspelledWord.toLowerCase(), word) <= maxDistance) {
+                            suggestions.push(word);
+                            if (suggestions.length >= 10) break; // Limit to top 10 suggestions
+                        }
                     }
                 }
                 return suggestions;
             }
 
             collectAllWords(node, currentWord, result) {
+                if (result.length > 5000) return; // Prevent freeze on massive dictionary search
                 if (node.isEndOfWord) result.push(currentWord);
                 for (let ch in node.children) {
                     this.collectAllWords(node.children[ch], currentWord + ch, result);
@@ -238,43 +260,66 @@
             }
         }
 
-        // Initialize Dictionary with Fallback Words
         const dictionary = new TrieDictionary();
-        const defaultWords = [
-            "fun", "mother", "father", "matter", "brother", "sister",
-            "apple", "application", "banana", "cat", "catch", "dog",
-            "hello", "world", "java", "program", "programming", "algorithm",
-            "structure", "object", "oriented", "microsoft", "word", "spell",
-            "checker", "system", "quick", "brown", "fox", "jumps", "over",
-            "lazy", "daffodil", "university", "mahim"
-        ];
-        defaultWords.forEach(w => dictionary.insert(w));
+        const dictStatus = document.getElementById('dictStatus');
 
-        // Load dictionary.txt if available
-        fetch('dictionary.txt')
-            .then(res => res.ok ? res.text() : Promise.reject())
+        // Essential common English words (including 1-letter, 2-letter words like a, i, in, on, at, go, to, etc.)
+        const basicWords = [
+            "a", "i", "an", "am", "is", "are", "in", "on", "at", "to", "of", "it", "if", "or", "be", "by", "he", "we", "me", "my", "do", "go", "no", "so", "up", "us",
+            "and", "the", "cat", "dog", "fun", "mother", "father", "matter", "brother", "sister", "apple", "application", "banana", "catch", "hello",
+            "world", "java", "program", "programming", "algorithm", "structure", "object", "oriented", "microsoft", "word", "spell", "checker", "system",
+            "quick", "brown", "fox", "jumps", "over", "lazy", "daffodil", "university", "mahim"
+        ];
+
+        // Insert basic words instantly
+        basicWords.forEach(w => dictionary.insert(w));
+
+        // Fetch huge dictionary (470k+ words) online via Raw GitHub CDN
+        fetch('https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt')
+            .then(res => res.text())
             .then(text => {
-                text.split(/\r?\n/).forEach(line => {
-                    const w = line.trim().toLowerCase();
-                    if (w) dictionary.insert(w);
+                const words = text.split(/\r?\n/);
+                words.forEach(w => {
+                    const clean = w.trim().toLowerCase();
+                    if (clean) dictionary.insert(clean);
                 });
-            }).catch(() => {});
+                dictStatus.innerText = "(Full Dictionary Ready)";
+                checkSpelling();
+            })
+            .catch(() => {
+                // Local fallback dictionary if offline or local server
+                fetch('dictionary.txt')
+                    .then(res => res.text())
+                    .then(text => {
+                        text.split(/\r?\n/).forEach(line => dictionary.insert(line));
+                        dictStatus.innerText = "(Local Dictionary Ready)";
+                        checkSpelling();
+                    })
+                    .catch(() => {
+                        dictStatus.innerText = "(Basic Dictionary Ready)";
+                    });
+            });
 
         const editor = document.getElementById('editor');
         const badWordsBox = document.getElementById('badWordsBox');
         const suggestionsBox = document.getElementById('suggestionsBox');
         let selectedWordToFix = "";
 
-        // Check Spelling
+        // Core Real-time Checking Function
         function checkSpelling() {
             const text = editor.value;
-            const words = text.split(/\s+/);
+            // Split text by any spaces, line breaks, or punctuation
+            const tokens = text.split(/[\s\n\r\t,.;:!?()"-]+/);
             const badWords = new Set();
 
-            words.forEach(word => {
-                const clean = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                if (clean.length > 0 && !dictionary.search(clean)) {
-                    badWords.add(clean);
+            tokens.forEach(token => {
+                const cleanWord = token.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                
+                // Allow valid single letter words like 'a' or 'i'
+                if (cleanWord.length > 0) {
+                    if (!dictionary.search(cleanWord)) {
+                        badWords.add(cleanWord);
+                    }
                 }
             });
 
@@ -318,7 +363,10 @@
             suggestionsBox.innerHTML = '<div class="empty-state">Word replaced!</div>';
         }
 
+        // Event listeners for immediate real-time response
         editor.addEventListener('input', checkSpelling);
+        editor.addEventListener('keyup', checkSpelling);
+        editor.addEventListener('paste', () => setTimeout(checkSpelling, 100));
     </script>
 </body>
 </html>
