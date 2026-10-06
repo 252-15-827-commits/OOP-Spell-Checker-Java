@@ -9,7 +9,7 @@
             box-sizing: border-box;
             margin: 0;
             padding: 0;
-            font-family: Arial, Helvetica, sans-serif;
+            font-family: Arial, sans-serif;
         }
 
         body {
@@ -26,7 +26,6 @@
 
         h1 {
             font-size: 24px;
-            font-weight: 600;
             color: #111111;
         }
 
@@ -39,51 +38,40 @@
         .container {
             display: flex;
             gap: 20px;
-            max-width: 1000px;
+            max-width: 900px;
             margin: 0 auto;
         }
 
         .editor-section {
             flex: 1;
-            display: flex;
-            flex-direction: column;
         }
 
         .section-title {
             font-size: 12px;
             font-weight: bold;
             color: #555555;
-            text-transform: uppercase;
             margin-bottom: 8px;
             letter-spacing: 0.5px;
         }
 
-        /* Editor Area */
-        .editor-container {
-            position: relative;
-            width: 100%;
-            height: 350px;
-            border: 1px solid #0066cc;
-            border-radius: 4px;
-            background: #ffffff;
-        }
-
+        /* Fixed Standard Input Area */
         textarea {
             width: 100%;
-            height: 100%;
+            height: 350px;
             padding: 15px;
             font-family: 'Times New Roman', Times, serif;
             font-size: 18px;
-            border: none;
+            border: 1px solid #0066cc;
+            border-radius: 4px;
             outline: none;
             resize: none;
-            background: transparent;
             line-height: 1.5;
-            color: #000;
+            direction: ltr !important;
+            text-align: left !important;
         }
 
         .suggestions-section {
-            width: 260px;
+            width: 280px;
             display: flex;
             flex-direction: column;
         }
@@ -91,10 +79,11 @@
         .suggestions-box {
             border: 1px solid #d0d0d0;
             border-radius: 4px;
-            height: 350px;
+            height: 180px;
             padding: 10px;
             background-color: #fafafa;
             overflow-y: auto;
+            margin-bottom: 15px;
         }
 
         .suggestion-item {
@@ -106,7 +95,6 @@
             cursor: pointer;
             font-weight: bold;
             color: #0066cc;
-            transition: all 0.2s ease;
         }
 
         .suggestion-item:hover {
@@ -122,47 +110,31 @@
             margin-top: 20px;
         }
 
-        .bad-words-list {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #fff8f8;
+        .bad-words-box {
             border: 1px solid #ffd0d0;
+            background-color: #fff8f8;
             border-radius: 4px;
-        }
-
-        .bad-words-title {
-            font-size: 12px;
-            font-weight: bold;
-            color: #cc0000;
-            margin-bottom: 6px;
+            padding: 10px;
+            height: 155px;
+            overflow-y: auto;
         }
 
         .bad-word-chip {
             display: inline-block;
             background: #ffe6e6;
             color: #cc0000;
-            padding: 3px 8px;
+            padding: 4px 10px;
             border-radius: 12px;
-            font-size: 12px;
-            margin: 2px;
+            font-size: 13px;
+            margin: 3px;
             cursor: pointer;
             border: 1px solid #ffb3b3;
+            font-weight: 500;
         }
 
         .bad-word-chip:hover {
             background: #cc0000;
             color: #ffffff;
-        }
-
-        .tip-box {
-            margin-top: 15px;
-            padding: 10px;
-            background-color: #f0f7ff;
-            border: 1px solid #d0e4ff;
-            border-radius: 4px;
-            font-size: 12px;
-            color: #004488;
-            line-height: 1.4;
         }
     </style>
 </head>
@@ -174,34 +146,28 @@
     </header>
 
     <div class="container">
-        <!-- Text Editor Section -->
+        <!-- Editor Section -->
         <div class="editor-section">
             <div class="section-title">DOCUMENT EDITOR</div>
-            <div class="editor-container">
-                <textarea id="editor" placeholder="Type here (e.g., rehtaf, moter, appl)..."></textarea>
-            </div>
+            <textarea id="editor" placeholder="Type here... (Try typing misspelled words like rehtaf, moter, appl)"></textarea>
         </div>
 
-        <!-- Suggestions Section -->
+        <!-- Suggestions Side Panel -->
         <div class="suggestions-section">
+            <div class="section-title">MISSPELLED WORDS (CLICK TO FIX)</div>
+            <div class="bad-words-box" id="badWordsBox">
+                <div class="empty-state">No spelling errors detected</div>
+            </div>
+
             <div class="section-title">SUGGESTIONS</div>
             <div class="suggestions-box" id="suggestionsBox">
-                <div class="empty-state">Select or click an incorrect word to see suggestions</div>
-            </div>
-
-            <div class="bad-words-list" id="badWordsContainer" style="display: none;">
-                <div class="bad-words-title">MISSPELLED WORDS:</div>
-                <div id="badWordsChips"></div>
-            </div>
-
-            <div class="tip-box">
-                <strong>Tip:</strong> Misspelled words are detected automatically. Click on any misspelled word chip above to see suggestions and fix it.
+                <div class="empty-state">Select a misspelled word above</div>
             </div>
         </div>
     </div>
 
     <script>
-        // 1. Trie Data Structure Node
+        // 1. Trie Data Structure
         class TrieNode {
             constructor() {
                 this.children = {};
@@ -209,7 +175,6 @@
             }
         }
 
-        // 2. Trie Dictionary Implementation
         class TrieDictionary {
             constructor() {
                 this.root = new TrieNode();
@@ -217,8 +182,7 @@
 
             insert(word) {
                 let current = this.root;
-                const cleanWord = word.toLowerCase();
-                for (let ch of cleanWord) {
+                for (let ch of word.toLowerCase()) {
                     if (!current.children[ch]) {
                         current.children[ch] = new TrieNode();
                     }
@@ -229,8 +193,7 @@
 
             search(word) {
                 let current = this.root;
-                const cleanWord = word.toLowerCase();
-                for (let ch of cleanWord) {
+                for (let ch of word.toLowerCase()) {
                     if (!current.children[ch]) return false;
                     current = current.children[ch];
                 }
@@ -251,9 +214,7 @@
             }
 
             collectAllWords(node, currentWord, result) {
-                if (node.isEndOfWord) {
-                    result.push(currentWord);
-                }
+                if (node.isEndOfWord) result.push(currentWord);
                 for (let ch in node.children) {
                     this.collectAllWords(node.children[ch], currentWord + ch, result);
                 }
@@ -261,7 +222,6 @@
 
             computeLevenshteinDistance(str1, str2) {
                 const dp = Array(str1.length + 1).fill(null).map(() => Array(str2.length + 1).fill(0));
-
                 for (let i = 0; i <= str1.length; i++) dp[i][0] = i;
                 for (let j = 0; j <= str2.length; j++) dp[0][j] = j;
 
@@ -270,11 +230,7 @@
                         if (str1[i - 1] === str2[j - 1]) {
                             dp[i][j] = dp[i - 1][j - 1];
                         } else {
-                            dp[i][j] = 1 + Math.min(
-                                dp[i - 1][j - 1], // substitution
-                                dp[i - 1][j],     // deletion
-                                dp[i][j - 1]      // insertion
-                            );
+                            dp[i][j] = 1 + Math.min(dp[i - 1][j - 1], dp[i - 1][j], dp[i][j - 1]);
                         }
                     }
                 }
@@ -282,9 +238,9 @@
             }
         }
 
-        // Initialize Dictionary
+        // Initialize Dictionary with Fallback Words
         const dictionary = new TrieDictionary();
-        const sampleWords = [
+        const defaultWords = [
             "fun", "mother", "father", "matter", "brother", "sister",
             "apple", "application", "banana", "cat", "catch", "dog",
             "hello", "world", "java", "program", "programming", "algorithm",
@@ -292,33 +248,22 @@
             "checker", "system", "quick", "brown", "fox", "jumps", "over",
             "lazy", "daffodil", "university", "mahim"
         ];
-
-        sampleWords.forEach(w => dictionary.insert(w));
+        defaultWords.forEach(w => dictionary.insert(w));
 
         // Load dictionary.txt if available
         fetch('dictionary.txt')
-            .then(response => {
-                if (response.ok) return response.text();
-                throw new Error('Not found');
-            })
+            .then(res => res.ok ? res.text() : Promise.reject())
             .then(text => {
-                const lines = text.split(/\r?\n/);
-                lines.forEach(line => {
+                text.split(/\r?\n/).forEach(line => {
                     const w = line.trim().toLowerCase();
                     if (w) dictionary.insert(w);
                 });
-            })
-            .catch(() => {
-                console.log('Using default fallback words dictionary.');
-            });
+            }).catch(() => {});
 
-        // DOM Elements
         const editor = document.getElementById('editor');
+        const badWordsBox = document.getElementById('badWordsBox');
         const suggestionsBox = document.getElementById('suggestionsBox');
-        const badWordsContainer = document.getElementById('badWordsContainer');
-        const badWordsChips = document.getElementById('badWordsChips');
-
-        let selectedBadWord = "";
+        let selectedWordToFix = "";
 
         // Check Spelling
         function checkSpelling() {
@@ -327,42 +272,40 @@
             const badWords = new Set();
 
             words.forEach(word => {
-                const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
-                if (cleanWord.length > 0 && !dictionary.search(cleanWord)) {
-                    badWords.add(cleanWord);
+                const clean = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
+                if (clean.length > 0 && !dictionary.search(clean)) {
+                    badWords.add(clean);
                 }
             });
 
-            // Update Bad Words Chips
             if (badWords.size > 0) {
-                badWordsContainer.style.display = 'block';
-                badWordsChips.innerHTML = '';
+                badWordsBox.innerHTML = '';
                 badWords.forEach(word => {
                     const chip = document.createElement('span');
                     chip.className = 'bad-word-chip';
                     chip.innerText = word;
-                    chip.onclick = () => showSuggestionsForWord(word);
-                    badWordsChips.appendChild(chip);
+                    chip.onclick = () => showSuggestions(word);
+                    badWordsBox.appendChild(chip);
                 });
             } else {
-                badWordsContainer.style.display = 'none';
-                suggestionsBox.innerHTML = '<div class="empty-state">No spelling errors found!</div>';
+                badWordsBox.innerHTML = '<div class="empty-state">No spelling errors detected</div>';
+                suggestionsBox.innerHTML = '<div class="empty-state">Select a misspelled word above</div>';
             }
         }
 
-        function showSuggestionsForWord(word) {
-            selectedBadWord = word;
-            const suggestions = dictionary.getSuggestions(word, 2);
+        function showSuggestions(word) {
+            selectedWordToFix = word;
+            const list = dictionary.getSuggestions(word, 2);
             suggestionsBox.innerHTML = '';
 
-            if (suggestions.length === 0) {
+            if (list.length === 0) {
                 suggestionsBox.innerHTML = '<div class="empty-state">No suggestions found</div>';
             } else {
-                suggestions.forEach(sug => {
+                list.forEach(sug => {
                     const item = document.createElement('div');
                     item.className = 'suggestion-item';
                     item.innerText = sug;
-                    item.onclick = () => replaceWord(selectedBadWord, sug);
+                    item.onclick = () => replaceWord(selectedWordToFix, sug);
                     suggestionsBox.appendChild(item);
                 });
             }
@@ -372,10 +315,9 @@
             const regex = new RegExp('\\b' + oldWord + '\\b', 'gi');
             editor.value = editor.value.replace(regex, newWord);
             checkSpelling();
-            suggestionsBox.innerHTML = '<div class="empty-state">Word replaced successfully!</div>';
+            suggestionsBox.innerHTML = '<div class="empty-state">Word replaced!</div>';
         }
 
-        // Event Listeners
         editor.addEventListener('input', checkSpelling);
     </script>
 </body>
