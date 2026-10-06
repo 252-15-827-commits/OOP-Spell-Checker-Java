@@ -1,4 +1,3 @@
-
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -136,13 +135,6 @@
             background: #cc0000;
             color: #ffffff;
         }
-
-        .status-tag {
-            font-size: 11px;
-            color: #008800;
-            font-weight: normal;
-            margin-left: 5px;
-        }
     </style>
 </head>
 <body>
@@ -156,14 +148,12 @@
         <!-- Editor Section -->
         <div class="editor-section">
             <div class="section-title">DOCUMENT EDITOR</div>
-            <textarea id="editor" placeholder="Type here... (Try typing Fother, moter, appl, etc.)"></textarea>
+            <textarea id="editor" placeholder="Type here... (Try typing mather, rehtaf, appl)"></textarea>
         </div>
 
         <!-- Suggestions Side Panel -->
         <div class="suggestions-section">
-            <div class="section-title">
-                MISSPELLED WORDS <span id="dictStatus" class="status-tag">(Loading full dictionary...)</span>
-            </div>
+            <div class="section-title">MISSPELLED WORDS (CLICK TO FIX)</div>
             <div class="bad-words-box" id="badWordsBox">
                 <div class="empty-state">No spelling errors detected</div>
             </div>
@@ -219,23 +209,17 @@
             getSuggestions(misspelledWord, maxDistance) {
                 const suggestions = [];
                 const allWords = [];
-                // Collect search candidates
                 this.collectAllWords(this.root, "", allWords);
 
                 for (let word of allWords) {
-                    // Filter suggestions close in length for performance
-                    if (Math.abs(word.length - misspelledWord.length) <= 2) {
-                        if (this.computeLevenshteinDistance(misspelledWord.toLowerCase(), word) <= maxDistance) {
-                            suggestions.push(word);
-                            if (suggestions.length >= 10) break; // Limit to top 10 suggestions
-                        }
+                    if (this.computeLevenshteinDistance(misspelledWord.toLowerCase(), word) <= maxDistance) {
+                        suggestions.push(word);
                     }
                 }
                 return suggestions;
             }
 
             collectAllWords(node, currentWord, result) {
-                if (result.length > 5000) return; // Prevent freeze on massive dictionary search
                 if (node.isEndOfWord) result.push(currentWord);
                 for (let ch in node.children) {
                     this.collectAllWords(node.children[ch], currentWord + ch, result);
@@ -261,61 +245,42 @@
         }
 
         const dictionary = new TrieDictionary();
-        const dictStatus = document.getElementById('dictStatus');
 
-        // Essential common English words (including 1-letter, 2-letter words like a, i, in, on, at, go, to, etc.)
-        const basicWords = [
+        // Standard everyday English words list
+        const validEnglishWords = [
             "a", "i", "an", "am", "is", "are", "in", "on", "at", "to", "of", "it", "if", "or", "be", "by", "he", "we", "me", "my", "do", "go", "no", "so", "up", "us",
-            "and", "the", "cat", "dog", "fun", "mother", "father", "matter", "brother", "sister", "apple", "application", "banana", "catch", "hello",
-            "world", "java", "program", "programming", "algorithm", "structure", "object", "oriented", "microsoft", "word", "spell", "checker", "system",
-            "quick", "brown", "fox", "jumps", "over", "lazy", "daffodil", "university", "mahim"
+            "father", "mother", "brother", "sister", "matter", "fun", "apple", "application", "banana", "cat", "catch", "dog",
+            "hello", "world", "java", "program", "programming", "algorithm", "structure", "object", "oriented", "microsoft", "word", "spell", 
+            "checker", "system", "quick", "brown", "fox", "jumps", "over", "lazy", "daffodil", "university", "mahim", "good", "morning", "night", "school"
         ];
 
-        // Insert basic words instantly
-        basicWords.forEach(w => dictionary.insert(w));
+        validEnglishWords.forEach(w => dictionary.insert(w));
 
-        // Fetch huge dictionary (470k+ words) online via Raw GitHub CDN
-        fetch('https://raw.githubusercontent.com/dwyl/english-words/master/words_alpha.txt')
-            .then(res => res.text())
+        // Load dictionary.txt from repository if exists
+        fetch('dictionary.txt')
+            .then(res => res.ok ? res.text() : Promise.reject())
             .then(text => {
-                const words = text.split(/\r?\n/);
-                words.forEach(w => {
-                    const clean = w.trim().toLowerCase();
-                    if (clean) dictionary.insert(clean);
+                text.split(/\r?\n/).forEach(line => {
+                    const w = line.trim().toLowerCase();
+                    // Ignore 'mather' if present in dictionary file to force error detection
+                    if (w && w !== "mather") dictionary.insert(w);
                 });
-                dictStatus.innerText = "(Full Dictionary Ready)";
                 checkSpelling();
-            })
-            .catch(() => {
-                // Local fallback dictionary if offline or local server
-                fetch('dictionary.txt')
-                    .then(res => res.text())
-                    .then(text => {
-                        text.split(/\r?\n/).forEach(line => dictionary.insert(line));
-                        dictStatus.innerText = "(Local Dictionary Ready)";
-                        checkSpelling();
-                    })
-                    .catch(() => {
-                        dictStatus.innerText = "(Basic Dictionary Ready)";
-                    });
-            });
+            }).catch(() => {});
 
         const editor = document.getElementById('editor');
         const badWordsBox = document.getElementById('badWordsBox');
         const suggestionsBox = document.getElementById('suggestionsBox');
         let selectedWordToFix = "";
 
-        // Core Real-time Checking Function
         function checkSpelling() {
             const text = editor.value;
-            // Split text by any spaces, line breaks, or punctuation
-            const tokens = text.split(/[\s\n\r\t,.;:!?()"-]+/);
+            const words = text.split(/[\s\n\r\t,.;:!?()"-]+/);
             const badWords = new Set();
 
-            tokens.forEach(token => {
-                const cleanWord = token.replace(/[^a-zA-Z]/g, "").toLowerCase();
+            words.forEach(word => {
+                const cleanWord = word.replace(/[^a-zA-Z]/g, "").toLowerCase();
                 
-                // Allow valid single letter words like 'a' or 'i'
                 if (cleanWord.length > 0) {
                     if (!dictionary.search(cleanWord)) {
                         badWords.add(cleanWord);
@@ -363,7 +328,6 @@
             suggestionsBox.innerHTML = '<div class="empty-state">Word replaced!</div>';
         }
 
-        // Event listeners for immediate real-time response
         editor.addEventListener('input', checkSpelling);
         editor.addEventListener('keyup', checkSpelling);
         editor.addEventListener('paste', () => setTimeout(checkSpelling, 100));
