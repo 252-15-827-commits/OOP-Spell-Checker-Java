@@ -1,0 +1,467 @@
+<!DOCTYPE html>
+<html lang="bn">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Real-time Spell Checker</title>
+    <style>
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+
+        body {
+            background-color: #fdfdfd;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            min-height: 100vh;
+        }
+
+        header {
+            background-color: #ffffff;
+            border-bottom: 1px solid #e0e0e0;
+            padding: 16px 24px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.02);
+        }
+
+        header h1 {
+            font-size: 1.25rem;
+            color: #2b2b2b;
+            font-weight: 600;
+        }
+
+        header p {
+            font-size: 0.85rem;
+            color: #666;
+            margin-top: 4px;
+        }
+
+        .main-container {
+            display: flex;
+            flex: 1;
+            max-width: 1200px;
+            width: 100%;
+            margin: 20px auto;
+            background: #ffffff;
+            border: 1px solid #dcdcdc;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+            overflow: hidden;
+            height: calc(100vh - 120px);
+        }
+
+        /* Editor Section (Left) */
+        .editor-section {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            border-right: 1px solid #e0e0e0;
+            padding: 20px;
+            background: #ffffff;
+        }
+
+        .editor-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+
+        #editor {
+            flex: 1;
+            width: 100%;
+            padding: 16px;
+            font-family: 'Times New Roman', Times, serif;
+            font-size: 1.15rem;
+            line-height: 1.6;
+            border: 1px solid #cccccc;
+            border-radius: 6px;
+            outline: none;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-wrap: break-word;
+            background: #fafafa;
+            transition: border-color 0.2s, background 0.2s;
+        }
+
+        #editor:focus {
+            border-color: #0066cc;
+            background: #ffffff;
+        }
+
+        /* Misspelled word style matching Swing */
+        .misspelled {
+            color: #d93025;
+            text-decoration: underline wavy #d93025;
+            font-weight: 500;
+            cursor: pointer;
+            background-color: #fce8e6;
+            border-radius: 2px;
+            padding: 0 2px;
+        }
+
+        .misspelled.active {
+            background-color: #fad2cf;
+        }
+
+        /* Sidebar Section (Right) */
+        .sidebar {
+            width: 280px;
+            background-color: #f9f9f9;
+            display: flex;
+            flex-direction: column;
+            padding: 20px;
+        }
+
+        .sidebar-title {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: #555;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            border-bottom: 2px solid #e0e0e0;
+            padding-bottom: 6px;
+        }
+
+        .suggestion-list {
+            list-style: none;
+            overflow-y: auto;
+            flex: 1;
+            border: 1px solid #dcdcdc;
+            border-radius: 6px;
+            background: #ffffff;
+        }
+
+        .suggestion-item {
+            padding: 12px 16px;
+            font-family: Arial, sans-serif;
+            font-size: 0.95rem;
+            font-weight: bold;
+            color: #2c3e50;
+            border-bottom: 1px solid #f0f0f0;
+            cursor: pointer;
+            transition: background-color 0.15s ease, color 0.15s ease;
+        }
+
+        .suggestion-item:last-child {
+            border-bottom: none;
+        }
+
+        .suggestion-item:hover {
+            background-color: #e8f0fe;
+            color: #1a73e8;
+        }
+
+        .no-suggestions {
+            padding: 16px;
+            color: #888;
+            font-style: italic;
+            font-weight: normal;
+            font-size: 0.9rem;
+            text-align: center;
+            cursor: default;
+        }
+
+        .info-box {
+            margin-top: 15px;
+            font-size: 0.8rem;
+            color: #666;
+            background: #f0f4f9;
+            padding: 10px;
+            border-radius: 4px;
+            border-left: 3px solid #0066cc;
+        }
+
+        @media (max-width: 768px) {
+            .main-container {
+                flex-direction: column;
+                height: auto;
+            }
+            .editor-section {
+                border-right: none;
+                border-bottom: 1px solid #e0e0e0;
+                height: 350px;
+            }
+            .sidebar {
+                width: 100%;
+                height: 250px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>Real-time Spell Checker</h1>
+        <p>Trie Data Structure & Levenshtein Distance Algorithm (Converted from Java Swing)</p>
+    </header>
+
+    <div class="main-container">
+        <!-- Editor Left Pane -->
+        <div class="editor-section">
+            <div class="editor-title">Document Editor</div>
+            <div id="editor" contenteditable="true" spellcheck="false" placeholder="Type here... Try typing 'appl', 'progran', or 'worldd'..."></div>
+        </div>
+
+        <!-- Suggestions Right Pane -->
+        <div class="sidebar">
+            <div class="sidebar-title">Suggestions</div>
+            <ul id="suggestionList" class="suggestion-list">
+                <li class="no-suggestions">Click on a highlighted word to see suggestions</li>
+            </ul>
+            <div class="info-box">
+                <b>Tip:</b> Incorrect words will be underlined in red. Click any red word to replace it with suggestions.
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 1. Trie Data Structure Node
+        class TrieNode {
+            constructor() {
+                this.children = new Map();
+                this.isEndOfWord = false;
+            }
+        }
+
+        // 2. Trie Dictionary Implementation
+        class TrieDictionary {
+            constructor() {
+                this.root = new TrieNode();
+            }
+
+            insert(word) {
+                let current = this.root;
+                const lowerWord = word.toLowerCase();
+                for (let ch of lowerWord) {
+                    if (!current.children.has(ch)) {
+                        current.children.set(ch, new TrieNode());
+                    }
+                    current = current.children.get(ch);
+                }
+                current.isEndOfWord = true;
+            }
+
+            search(word) {
+                let current = this.root;
+                const lowerWord = word.toLowerCase();
+                for (let ch of lowerWord) {
+                    if (!current.children.has(ch)) return false;
+                    current = current.children.get(ch);
+                }
+                return current.isEndOfWord;
+            }
+
+            // Levenshtein Distance Algorithm for Suggestions
+            getSuggestions(misspelledWord, maxDistance) {
+                const suggestions = [];
+                const allWords = [];
+                this.collectAllWords(this.root, "", allWords);
+
+                const lowerMisspelled = misspelledWord.toLowerCase();
+
+                for (let word of allWords) {
+                    if (this.computeLevenshteinDistance(lowerMisspelled, word) <= maxDistance) {
+                        suggestions.push(word);
+                    }
+                }
+                return suggestions;
+            }
+
+            collectAllWords(node, currentWord, result) {
+                if (node.isEndOfWord) {
+                    result.push(currentWord);
+                }
+                for (let [ch, childNode] of node.children.entries()) {
+                    this.collectAllWords(childNode, currentWord + ch, result);
+                }
+            }
+
+            computeLevenshteinDistance(str1, str2) {
+                const dp = Array(str1.length + 1).fill(null).map(() => Array(str2.length + 1).fill(0));
+
+                for (let i = 0; i <= str1.length; i++) dp[i][0] = i;
+                for (let j = 0; j <= str2.length; j++) dp[0][j] = j;
+
+                for (let i = 1; i <= str1.length; i++) {
+                    for (let j = 1; j <= str2.length; j++) {
+                        if (str1.charAt(i - 1) === str2.charAt(j - 1)) {
+                            dp[i][j] = dp[i - 1][j - 1];
+                        } else {
+                            dp[i][j] = 1 + Math.min(
+                                dp[i - 1][j - 1], // substitution
+                                Math.min(dp[i - 1][j], dp[i][j - 1]) // deletion, insertion
+                            );
+                        }
+                    }
+                }
+                return dp[str1.length][str2.length];
+            }
+        }
+
+        // Initialize Dictionary
+        const dictionary = new TrieDictionary();
+        const fallbackWords = [
+            "fun", "mother", "father", "matter", "brother", "sister",
+            "apple", "application", "banana", "cat", "catch", "dog",
+            "hello", "world", "java", "program", "programming", "algorithm",
+            "structure", "object", "oriented", "microsoft", "word", "spell",
+            "checker", "system", "quick", "brown", "fox", "jumps", "over",
+            "lazy", "daffodil", "university", "mahim"
+        ];
+
+        fallbackWords.forEach(w => dictionary.insert(w));
+
+        // DOM References
+        const editor = document.getElementById('editor');
+        const suggestionList = document.getElementById('suggestionList');
+        let selectedWordElement = null;
+
+        
+        // Helper to preserve caret position in contenteditable
+        function getCaretIndex(element) {
+            let position = 0;
+            const selection = window.getSelection();
+            if (selection.rangeCount !== 0) {
+                const range = selection.getRangeAt(0);
+                const preCaretRange = range.cloneRange();
+                preCaretRange.selectNodeContents(element);
+                preCaretRange.setEnd(range.endContainer, range.endOffset);
+                position = preCaretRange.toString().length;
+            }
+            return position;
+        }
+
+        function setCaretIndex(element, offset) {
+            const range = document.createRange();
+            const selection = window.getSelection();
+            let currentOffset = 0;
+            let found = false;
+
+            function traverse(node) {
+                if (found) return;
+                if (node.nodeType === Node.TEXT_NODE) {
+                    const nextOffset = currentOffset + node.textLength;
+                    if (offset <= nextOffset) {
+                        range.setStart(node, offset - currentOffset);
+                        range.collapse(true);
+                        found = true;
+                    } else {
+                        currentOffset = nextOffset;
+                    }
+                } else {
+                    for (let child of node.childNodes) {
+                        traverse(child);
+                        if (found) break;
+                    }
+                }
+            }
+
+            traverse(element);
+
+            if (found) {
+                selection.removeAllRanges();
+                selection.addRange(range);
+            }
+        }
+
+        // Spell checking core function
+        function checkSpelling() {
+            const caretPos = getCaretIndex(editor);
+            const text = editor.innerText;
+            
+            // Regex to match words and non-words
+            const tokens = text.split(/(\s+|[^\w\s]+)/);
+
+            let html = '';
+            let charCounter = 0;
+
+            tokens.forEach(token => {
+                const cleanToken = token.replace(/[^a-zA-Z]/g, '');
+                const searchToken = cleanToken.toLowerCase();
+
+                if (cleanToken.length > 0 && !dictionary.search(searchToken)) {
+                    html += `<span class="misspelled" data-word="${cleanToken}">${token}</span>`;
+                } else {
+                    html += token;
+                }
+            });
+
+            editor.innerHTML = html;
+            setCaretIndex(editor, caretPos);
+            attachWordClickEvents();
+        }
+
+        
+        function attachWordClickEvents() {
+            const misspelledSpans = editor.querySelectorAll('.misspelled');
+            misspelledSpans.forEach(span => {
+                span.addEventListener('click', (e) => {
+                    e.stopPropagation();
+                    
+                    // Highlight active misspell
+                    if (selectedWordElement) {
+                        selectedWordElement.classList.remove('active');
+                    }
+                    selectedWordElement = span;
+                    selectedWordElement.classList.add('active');
+
+                    const cleanWord = span.getAttribute('data-word');
+                    showSuggestions(cleanWord);
+                });
+            });
+        }
+
+        function showSuggestions(word) {
+            suggestionList.innerHTML = '';
+            const suggestions = dictionary.getSuggestions(word, 2);
+
+            if (suggestions.length === 0) {
+                suggestionList.innerHTML = '<li class="no-suggestions">No suggestions found</li>';
+            } else {
+                suggestions.forEach(sug => {
+                    const li = document.createElement('li');
+                    li.className = 'suggestion-item';
+                    li.textContent = sug;
+                    li.addEventListener('click', () => replaceWord(sug));
+                    suggestionList.appendChild(li);
+                });
+            }
+        }
+
+        function replaceWord(newWord) {
+            if (selectedWordElement) {
+                selectedWordElement.outerHTML = newWord + ' ';
+                selectedWordElement = null;
+                suggestionList.innerHTML = '<li class="no-suggestions">Select a misspelled word</li>';
+                checkSpelling();
+            }
+        }
+
+        // Real-time listener
+        let isComposing = false;
+        editor.addEventListener('input', () => {
+            if (!isComposing) {
+                checkSpelling();
+            }
+        });
+
+        // Click outside to deselect
+        document.addEventListener('click', (e) => {
+            if (!editor.contains(e.target) && !suggestionList.contains(e.target)) {
+                if (selectedWordElement) {
+                    selectedWordElement.classList.remove('active');
+                    selectedWordElement = null;
+                }
+                suggestionList.innerHTML = '<li class="no-suggestions">Click on a highlighted word to see suggestions</li>';
+            }
+        });
+    </script>
+</body>
+</html>
